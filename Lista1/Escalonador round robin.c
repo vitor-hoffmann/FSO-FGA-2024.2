@@ -1,49 +1,92 @@
 #include <stdio.h>
+#include <stdlib.h>
+
+typedef struct Node {
+    int pid;            // Identificador do processo
+    int time_left;      // Tempo restante para execução (em milissegundos)
+    struct Node *next;  // Próximo nó (para lista circular)
+} Node;
+
+// Função para criar um novo nó
+Node* create_node(int pid, int time_left) {
+    Node* new_node = (Node*)malloc(sizeof(Node));
+    new_node->pid = pid;
+    new_node->time_left = time_left;
+    new_node->next = NULL;
+    return new_node;
+}
+
+// Função para adicionar um nó à lista circular
+Node* add_to_list(Node* tail, int pid, int time_left) {
+    Node* new_node = create_node(pid, time_left);
+    if (tail == NULL) {
+        new_node->next = new_node; // Lista circular com um único nó
+        return new_node;
+    }
+    new_node->next = tail->next;
+    tail->next = new_node;
+    return new_node;
+}
+
+// Função para remover um nó da lista circular
+Node* remove_from_list(Node* tail, Node* target) {
+    if (tail == target && tail->next == target) {
+        free(target); // Remove o único nó da lista
+        return NULL;
+    }
+
+    Node* current = tail;
+    while (current->next != target) {
+        current = current->next;
+    }
+    current->next = target->next;
+    if (tail == target) {
+        tail = current;
+    }
+    free(target);
+    return tail;
+}
 
 int main() {
-    int cnt, j, n, t, remain, flag = 0, tq;
-    int wt = 0, tat = 0, at[201], bt[201], rt[201], pid[201];
+    int n, tq;
+    int total_time = 0; // Tempo total de execução
 
     // Lê o número de processos
     scanf("%d", &n);
 
-    remain = n;
-    // Lê o quantum de tempo
+    // Lê o quantum de tempo (em milissegundos)
     scanf("%d", &tq);
 
-    // Lê os tempos de burst (ignora os tempos de chegada)
-    for (cnt = 0; cnt < n; cnt++) {
-        int id, burst_time;
-        scanf("%d %d", &id, &burst_time);
-        at[cnt] = 0;      // Define os tempos de chegada como 0
-        bt[cnt] = burst_time * 1000;
-        rt[cnt] = burst_time * 1000;
-        pid[cnt] = id;
+    // Lista circular de processos
+    Node* tail = NULL;
+
+    // Lê os processos
+    for (int i = 0; i < n; i++) {
+        int pid, burst_time;
+        scanf("%d %d", &pid, &burst_time);
+        tail = add_to_list(tail, pid, (burst_time * 1000)); // Adiciona à lista circular
     }
 
     // Escalonador Round-Robin
-    for (t = 0, cnt = 0; remain != 0;) {
-        if (rt[cnt] <= tq && rt[cnt] > 0) {
-            t += rt[cnt];
-            rt[cnt] = 0;
-            flag = 1;
-        } else if (rt[cnt] > 0) {
-            rt[cnt] -= tq;
-            t += tq;
-        }
-        if (rt[cnt] == 0 && flag == 1) {
-            remain--;
-            printf("%d (%d)\n", pid[cnt], t); // Saída no formato esperado
-            wt += t - at[cnt] - bt[cnt];
-            tat += t - at[cnt];
-            flag = 0;
-        }
-        if (cnt == n - 1) {
-            cnt = 0;
-        } else if (at[cnt + 1] <= t) {
-            cnt++;
+    Node* current = tail ? tail->next : NULL; // Começa pelo primeiro processo
+    while (current) {
+        Node* next_process = current->next; // Armazena o próximo processo antes de qualquer alteração
+
+        if (current->time_left <= tq) {
+            // Processo é finalizado neste ciclo
+            total_time += current->time_left;
+            printf("%d (%d)\n", current->pid, total_time); // Imprime o tempo de término do processo
+            tail = remove_from_list(tail, current); // Remove o processo concluído
+            if (tail == NULL) {
+                current = NULL; // Lista vazia, finaliza o escalonador
+            } else {
+                current = next_process; // Avança para o próximo processo
+            }
         } else {
-            cnt = 0;
+            // Processo é executado parcialmente
+            current->time_left -= tq;
+            total_time += tq;
+            current = next_process; // Avança para o próximo processo
         }
     }
 
